@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import {
+  animate,
   motion,
+  useMotionValue,
   useMotionValueEvent,
   useReducedMotion,
   useScroll,
@@ -51,14 +53,24 @@ export function HelixShelf() {
   )
 }
 
+const SWIPE_QUERY = '(max-width: 640px)'
+const subscribeSwipe = (cb: () => void) => {
+  const mq = window.matchMedia(SWIPE_QUERY)
+  mq.addEventListener('change', cb)
+  return () => mq.removeEventListener('change', cb)
+}
+
+// Phones browse the helix by swiping; scroll-driven 3D was too heavy while the page itself scrolled
 function Helix() {
+  const swipe = useSyncExternalStore(subscribeSwipe, () => window.matchMedia(SWIPE_QUERY).matches)
+  return swipe ? <SwipeHelix /> : <ScrollHelix />
+}
+
+function ScrollHelix() {
   const trackRef = useRef<HTMLDivElement>(null)
-  const { w, radius, pitch, reach } = useHelixSize()
   const { scrollYProgress } = useScroll({ target: trackRef, offset: ['start start', 'end end'] })
   const progress = useSpring(scrollYProgress, { stiffness: 120, damping: 26, mass: 0.4 })
-
-  const rotateY = useTransform(progress, p => -p * LAST * STEP)
-  const y = useTransform(progress, p => -p * LAST * pitch)
+  const pos = useTransform(progress, p => p * LAST)
   const [active, setActive] = useState(0)
   useMotionValueEvent(scrollYProgress, 'change', p => setActive(Math.round(p * LAST)))
 
@@ -71,48 +83,114 @@ function Helix() {
     window.scrollTo({ top: top + (idx / LAST) * travel, behavior: 'smooth' })
   }
 
-  const book = books[active]
-
   return (
     <div ref={trackRef} className="helix-track" style={{ height: `${books.length * 28 + 100}vh` }}>
       <div className="helix-sticky">
-        <div className="helix-stage" style={{ ['--book-w' as string]: `${w}px` }}>
-          <motion.div className="helix" style={{ rotateY, y }}>
-            {books.map((b, i) => (
-              <HelixItem
-                key={i}
-                book={b}
-                index={i}
-                radius={radius}
-                pitch={pitch}
-                rotateY={rotateY}
-                onSelect={() => goTo(i)}
-                isActive={i === active}
-                hidden={Math.abs(i - active) > reach}
-              />
-            ))}
-          </motion.div>
-        </div>
-
-        <div className="helix-caption">
-          <div className="helix-meta" aria-live="polite">
-            <p className="find-no">{number(active)}</p>
-            <h3>{book.title.join(' ')}</h3>
-            <p className="find-meta">{book.author} · {book.meta}</p>
-          </div>
-          <div className="helix-controls">
-            <button type="button" className="round-btn" onClick={() => goTo(active - 1)} disabled={active === 0} aria-label="Libro anterior">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
-            </button>
-            <span className="counter">{active + 1} / {books.length}</span>
-            <button type="button" className="round-btn" onClick={() => goTo(active + 1)} disabled={active === LAST} aria-label="Libro siguiente">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
-            </button>
-            <a className="btn btn-solid" href={askFor(book)} target="_blank" rel="noopener">Consultar</a>
-          </div>
-        </div>
+        <HelixScene pos={pos} active={active} goTo={goTo} />
       </div>
     </div>
+  )
+}
+
+function SwipeHelix() {
+  const pos = useMotionValue(0)
+  const [active, setActive] = useState(0)
+  useMotionValueEvent(pos, 'change', p => setActive(Math.max(0, Math.min(LAST, Math.round(p)))))
+  const drag = useRef<{ x: number; pos: number; t: number; v: number } | null>(null)
+  const moved = useRef(false)
+
+  const settle = (target: number) => {
+    animate(pos, Math.max(0, Math.min(LAST, target)), { type: 'spring', stiffness: 170, damping: 26 })
+  }
+  const goTo = (i: number) => { if (!moved.current) settle(i) }
+
+  // One book per this many px of finger travel
+  const span = () => Math.min(window.innerWidth * 0.45, 180)
+
+  const handlers = {
+    onPointerDown: (e: React.PointerEvent) => {
+      pos.stop()
+      drag.current = { x: e.clientX, pos: pos.get(), t: e.timeStamp, v: 0 }
+      moved.current = false
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      const d = drag.current
+      if (!d) return
+      const dx = e.clientX - d.x
+      if (Math.abs(dx) > 6) moved.current = true
+      const next = Math.max(-0.4, Math.min(LAST + 0.4, d.pos - dx / span()))
+      const dt = e.timeStamp - d.t
+      if (dt > 0) d.v = (next - pos.get()) / dt
+      d.t = e.timeStamp
+      pos.set(next)
+    },
+    onPointerUp: () => {
+      const d = drag.current
+      drag.current = null
+      if (!d || !moved.current) return
+      // Fling: project ~150ms of velocity ahead before snapping to the nearest book
+      settle(Math.round(pos.get() + d.v * 150))
+    },
+    onPointerCancel: () => {
+      drag.current = null
+      settle(Math.round(pos.get()))
+    },
+  }
+
+  return (
+    <div className="helix-swipe">
+      <HelixScene pos={pos} active={active} goTo={goTo} stageProps={handlers} />
+    </div>
+  )
+}
+
+function HelixScene({ pos, active, goTo, stageProps }: {
+  pos: MotionValue<number>; active: number; goTo: (i: number) => void
+  stageProps?: React.HTMLAttributes<HTMLDivElement>
+}) {
+  const { w, radius, pitch, reach } = useHelixSize()
+  const rotateY = useTransform(pos, p => -p * STEP)
+  const y = useTransform(pos, p => -p * pitch)
+  const book = books[active]
+
+  return (
+    <>
+      <div className="helix-stage" style={{ ['--book-w' as string]: `${w}px` }} {...stageProps}>
+        <motion.div className="helix" style={{ rotateY, y }}>
+          {books.map((b, i) => (
+            <HelixItem
+              key={i}
+              book={b}
+              index={i}
+              radius={radius}
+              pitch={pitch}
+              rotateY={rotateY}
+              onSelect={() => goTo(i)}
+              isActive={i === active}
+              hidden={Math.abs(i - active) > reach}
+            />
+          ))}
+        </motion.div>
+      </div>
+
+      <div className="helix-caption">
+        <div className="helix-meta" aria-live="polite">
+          <p className="find-no">{number(active)}</p>
+          <h3>{book.title.join(' ')}</h3>
+          <p className="find-meta">{book.author} · {book.meta}</p>
+        </div>
+        <div className="helix-controls">
+          <button type="button" className="round-btn" onClick={() => goTo(active - 1)} disabled={active === 0} aria-label="Libro anterior">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+          </button>
+          <span className="counter">{active + 1} / {books.length}</span>
+          <button type="button" className="round-btn" onClick={() => goTo(active + 1)} disabled={active === LAST} aria-label="Libro siguiente">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+          </button>
+          <a className="btn btn-solid" href={askFor(book)} target="_blank" rel="noopener">Consultar</a>
+        </div>
+      </div>
+    </>
   )
 }
 

@@ -1,14 +1,19 @@
 .section-helix { padding-bottom: 0; }
 .section-helix .section-head { margin-bottom: 0; }
-.section-helix > .helix-track { max-width: none; margin-inline: calc(var(--gutter) * -1); }
+.section-helix > .helix-track,
+.section-helix > .helix-swipe { max-width: none; margin-inline: calc(var(--gutter) * -1); }
 
 .helix-track { position: relative; }
-.helix-sticky {
-  position: sticky; top: 0; height: 100svh; overflow: hidden;
+.helix-sticky { position: sticky; top: 0; height: 100svh; }
+.helix-sticky, .helix-swipe {
+  overflow: hidden;
   display: flex; flex-direction: column;
   padding-top: 64px;
   background: radial-gradient(ellipse 46% 42% at 50% 46%, rgba(176, 141, 87, .22), transparent 70%);
 }
+/* Phones: a fixed-height block browsed by horizontal swipes; vertical pans still scroll the page */
+.helix-swipe { position: relative; height: min(100svh, 760px); padding-top: 24px; }
+.helix-swipe .helix-stage { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
 .helix-stage {
   --book-h: calc(var(--book-w) * 1.5);
   position: relative; flex: 1; min-height: 0;
