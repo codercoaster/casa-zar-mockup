@@ -1,0 +1,95 @@
+.section-helix { padding-bottom: 0; }
+.section-helix .section-head { margin-bottom: 0; }
+.section-helix > .helix-track { max-width: none; margin-inline: calc(var(--gutter) * -1); }
+
+.helix-track { position: relative; }
+.helix-sticky {
+  position: sticky; top: 0; height: 100svh; overflow: hidden;
+  display: flex; flex-direction: column;
+  padding-top: 64px;
+  background: radial-gradient(ellipse 46% 42% at 50% 46%, rgba(176, 141, 87, .22), transparent 70%);
+}
+.helix-stage {
+  --book-h: calc(var(--book-w) * 1.5);
+  position: relative; flex: 1; min-height: 0;
+  perspective: 1600px; perspective-origin: 50% 40%;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 12%, #000 74%, transparent 97%);
+          mask-image: linear-gradient(180deg, transparent 0, #000 12%, #000 74%, transparent 97%);
+}
+.helix {
+  position: absolute; left: 50%; top: 44%;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.helix-item {
+  position: absolute;
+  width: var(--book-w); height: var(--book-h);
+  left: calc(var(--book-w) / -2); top: calc(var(--book-h) / -2);
+  transform-style: preserve-3d;
+}
+.book {
+  all: unset; cursor: pointer;
+  position: absolute; inset: 0;
+  transform-style: preserve-3d;
+}
+.book-front, .book-back {
+  position: absolute; inset: 0; border-radius: 2px 5px 5px 2px; overflow: hidden;
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+}
+.book-front { box-shadow: 0 16px 26px -10px rgba(31, 26, 23, .55), 0 1px 0 rgba(31, 26, 23, .3); }
+.book-back {
+  transform: rotateY(180deg);
+  opacity: .55;
+  background-image: linear-gradient(90deg, rgba(31, 26, 23, .5), rgba(31, 26, 23, .3)) !important;
+}
+.book.is-active .book-front {
+  outline: 1px solid var(--gold); outline-offset: 6px;
+  box-shadow: 0 26px 40px -14px rgba(31, 26, 23, .6);
+}
+.cover-svg { width: 100%; height: 100%; display: block; }
+
+.helix-caption {
+  position: relative; z-index: 2;
+  width: 100%; max-width: var(--max); margin-inline: auto;
+  padding: 0 var(--gutter) 28px;
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 18px 24px;
+}
+.helix-meta { min-height: 96px; }
+.helix-meta .find-no { margin-bottom: 4px; }
+.helix-meta h3 { font-size: clamp(1.6rem, 2.4vw + 1rem, 2.3rem); margin-bottom: 4px; }
+.helix-meta .find-meta { margin: 0; }
+.helix-controls { display: flex; align-items: center; gap: 12px; }
+.helix-controls .btn { margin-left: 8px; }
+.counter { font-family: var(--f-caps); letter-spacing: .12em; color: var(--ink-soft); min-width: 5ch; text-align: center; font-variant-numeric: oldstyle-nums; }
+.round-btn {
+  display: grid; place-items: center;
+  width: 46px; height: 46px; border-radius: 50%;
+  border: 1px solid var(--oxblood); background: transparent; color: var(--oxblood);
+  cursor: pointer; transition: background-color .35s, color .35s, opacity .35s;
+}
+.round-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.round-btn:hover:not(:disabled) { background: var(--oxblood); color: var(--paper); }
+.round-btn:disabled { opacity: .3; cursor: default; }
+@media (max-width: 640px) {
+  .helix-controls { width: 100%; }
+  .helix-controls .btn { margin-left: auto; }
+}
+
+.static-shelf {
+  list-style: none; padding: 40px 0 clamp(80px, 11vw, 140px);
+  display: grid; gap: 32px 24px;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+.static-shelf a { display: grid; gap: 4px; text-decoration: none; }
+.static-shelf svg { aspect-ratio: 2 / 3; height: auto; margin-bottom: 10px; box-shadow: 0 12px 20px -10px rgba(31, 26, 23, .5); }
+.static-shelf .find-no { margin: 0; }
+.static-title { font-family: var(--f-display); font-size: 1.2rem; line-height: 1.15; }
+.static-shelf .find-meta { font-size: .85rem; margin: 0; }
+
+.page-veil {
+  position: fixed; inset: 0; z-index: 40;
+  background: var(--paper);
+  opacity: 0; pointer-events: none;
+  transition: opacity .25s var(--ease);
+}
+.page-veil.is-on { opacity: 1; }
