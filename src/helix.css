@@ -13,9 +13,15 @@
   --book-h: calc(var(--book-w) * 1.5);
   position: relative; flex: 1; min-height: 0;
   perspective: 1600px; perspective-origin: 50% 40%;
-  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 12%, #000 74%, transparent 97%);
-          mask-image: linear-gradient(180deg, transparent 0, #000 12%, #000 74%, transparent 97%);
+  overflow: hidden;
 }
+/* Edge fades painted over the stage; a mask would re-composite the whole 3D scene every frame */
+.helix-stage::before,
+.helix-stage::after {
+  content: ""; position: absolute; left: 0; right: 0; z-index: 1; pointer-events: none;
+}
+.helix-stage::before { top: 0; height: 12%; background: linear-gradient(180deg, var(--paper), transparent); }
+.helix-stage::after { top: 74%; bottom: 0; background: linear-gradient(180deg, transparent, var(--paper) 88%); }
 .helix {
   position: absolute; left: 50%; top: 44%;
   transform-style: preserve-3d;
@@ -36,7 +42,12 @@
   position: absolute; inset: 0; border-radius: 2px 5px 5px 2px; overflow: hidden;
   backface-visibility: hidden; -webkit-backface-visibility: hidden;
 }
-.book-front { box-shadow: 0 16px 26px -10px rgba(31, 26, 23, .55), 0 1px 0 rgba(31, 26, 23, .3); }
+.book-shade {
+  position: absolute; inset: 0;
+  background: #3a2614;
+  will-change: opacity;
+}
+.book-front { will-change: opacity; box-shadow: 0 16px 26px -10px rgba(31, 26, 23, .55), 0 1px 0 rgba(31, 26, 23, .3); }
 .book-back {
   transform: rotateY(180deg);
   opacity: .55;

@@ -21,12 +21,14 @@ const askFor = (b: Book) => waLink(`Hola Casa Zar, quisiera consultar por "${b.t
 const number = (i: number) => `N.º ${String(i + 1).padStart(3, '0')}`
 
 function useHelixSize() {
-  const [size, setSize] = useState({ w: 180, radius: 360, pitch: 64 })
+  const [size, setSize] = useState({ w: 180, radius: 360, pitch: 64, reach: LAST })
   useEffect(() => {
     const update = () => {
       const vw = window.innerWidth
       const w = vw < 640 ? 132 : vw < 1024 ? 160 : 186
-      setSize({ w, radius: w * (vw < 640 ? 1.55 : 1.95), pitch: w * 0.34 })
+      const pitch = w * 0.34
+      // Books further than a viewport from the active one are off-stage; skip rendering them
+      setSize({ w, radius: w * (vw < 640 ? 1.55 : 1.95), pitch, reach: Math.ceil(window.innerHeight / pitch) })
     }
     update()
     window.addEventListener('resize', update)
@@ -51,7 +53,7 @@ export function HelixShelf() {
 
 function Helix() {
   const trackRef = useRef<HTMLDivElement>(null)
-  const { w, radius, pitch } = useHelixSize()
+  const { w, radius, pitch, reach } = useHelixSize()
   const { scrollYProgress } = useScroll({ target: trackRef, offset: ['start start', 'end end'] })
   const progress = useSpring(scrollYProgress, { stiffness: 120, damping: 26, mass: 0.4 })
 
@@ -86,6 +88,7 @@ function Helix() {
                 rotateY={rotateY}
                 onSelect={() => goTo(i)}
                 isActive={i === active}
+                hidden={Math.abs(i - active) > reach}
               />
             ))}
           </motion.div>
@@ -113,19 +116,23 @@ function Helix() {
   )
 }
 
-function HelixItem({ book, index, radius, pitch, rotateY, onSelect, isActive }: {
+function HelixItem({ book, index, radius, pitch, rotateY, onSelect, isActive, hidden }: {
   book: Book; index: number; radius: number; pitch: number
-  rotateY: MotionValue<number>; onSelect: () => void; isActive: boolean
+  rotateY: MotionValue<number>; onSelect: () => void; isActive: boolean; hidden: boolean
 }) {
   const angle = index * STEP
   const facing = useTransform(rotateY, r => Math.max(0, Math.cos(((angle + r) * Math.PI) / 180)))
+  // Only opacity animates per frame: it is composited, whereas a changing filter repaints the cover
   const opacity = useTransform(facing, f => 0.3 + f * 0.7)
-  const filter = useTransform(facing, f => `sepia(${(1 - f) * 0.5}) brightness(${0.7 + f * 0.3})`)
+  const shade = useTransform(facing, f => (1 - f) * 0.45)
 
   return (
     <div
       className="helix-item"
-      style={{ transform: `translateY(${index * pitch}px) rotateY(${angle}deg) translateZ(${radius}px)` }}
+      style={{
+        transform: `translateY(${index * pitch}px) rotateY(${angle}deg) translateZ(${radius}px)`,
+        visibility: hidden ? 'hidden' : undefined,
+      }}
     >
       <motion.button
         type="button"
@@ -136,7 +143,10 @@ function HelixItem({ book, index, radius, pitch, rotateY, onSelect, isActive }: 
         whileHover={{ y: -8 }}
         transition={{ type: 'spring', stiffness: 300, damping: 22 }}
       >
-        <motion.span className="book-front" style={{ opacity, filter }}><BookCover book={book} /></motion.span>
+        <motion.span className="book-front" style={{ opacity }}>
+          <BookCover book={book} />
+          <motion.span className="book-shade" style={{ opacity: shade }} />
+        </motion.span>
         <span className="book-back" style={{ background: book.bg }} />
       </motion.button>
     </div>
